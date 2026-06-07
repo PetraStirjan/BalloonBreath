@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "author": "Petra Štirjan & Patrik Ostrunić",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": -78.1, "left": 153.4, "attrs": {} },
+    {
+      "type": "board-ssd1306",
+      "id": "oled1",
+      "top": 137.54,
+      "left": 230.63,
+      "attrs": { "i2cAddress": "0x3c" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "pot1:VCC", "esp:3V3", "red", [] ],
+    [ "pot1:GND", "esp:GND.2", "black", [] ],
+    [ "pot1:SIG", "esp:34", "green", [] ],
+    [ "oled1:VCC", "esp:3V3", "red", [] ],
+    [ "oled1:GND", "esp:GND.3", "black", [] ],
+    [ "oled1:SDA", "esp:21", "green", [] ],
+    [ "oled1:SCL", "esp:22", "green", [] ]
+  ],
+  "dependencies": {}
+}
