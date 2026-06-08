@@ -5,3 +5,9 @@
 Adafruit GFX Library
 
 Adafruit SSD1306
+
+# Built into the ESP32 Arduino core:
+# WiFi
+# HTTPClient
+# WiFiClientSecure
+# Preferences

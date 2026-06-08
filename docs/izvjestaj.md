@@ -1,12 +1,12 @@
 # Izvještaj projekta BalloonBreath
 
-## Kolegij
-
-Računalni ugrađeni sustavi (RUS)
-
 ## Projekt
 
-BalloonBreath – IoT digitalni spirometar temeljen na ESP32 platformi
+Digitalni poticajni spirometar na ESP32 platformi
+
+Wokwi projekt:
+
+https://wokwi.com/projects/466203868077330433
 
 ## Autori
 
@@ -15,560 +15,390 @@ BalloonBreath – IoT digitalni spirometar temeljen na ESP32 platformi
 
 ---
 
-# Sažetak
+# 1. Sažetak
 
-BalloonBreath predstavlja digitalnu simulaciju medicinskog poticajnog spirometra razvijenu na ESP32 mikrokontrolerskoj platformi. Sustav koristi potenciometar kao emulator protoka zraka te OLED zaslon za prikaz respiratorne vježbe u obliku interaktivne igre s balonom na vrući zrak.
+BalloonBreath je edukacijska simulacija poticajnog spirometra izvedena na ESP32
+platformi. Sustav koristi potenciometar kao emulator protoka daha, OLED zaslon
+kao korisničko sučelje te Wi-Fi vezu za slanje rezultata vježbe poslužitelju.
 
-Cilj korisnika je održavati simulirani protok zraka unutar medicinski definirane zone od 900 ml/s do 1200 ml/s tijekom minimalno pet sekundi uz zadržavanje stabilnog disanja. Sustav implementira filtriranje signala, procjenu stabilnosti, numeričku integraciju volumena te pohranu najboljeg rezultata u trajnu memoriju ESP32 mikrokontrolera.
+U klasičnom mehaničkom poticajnom spirometru pacijent udiše zrak kako bi podigao
+tri kuglice kalibrirane na protoke od 600, 900 i 1200 ml/s. U ovom projektu
+zadržani su isti medicinski pragovi, ali je prikaz prilagođen pacijentima kroz
+jednostavnije i motivirajuće sučelje s balonom. Balon predstavlja trenutni protok
+udaha, dok sigurna zona označava raspon u kojem pacijent treba zadržati dah.
 
-Projekt zadovoljava sve obvezne zahtjeve zadatka te implementira dodatne napredne funkcionalnosti propisane projektnom dokumentacijom.
-
----
-
-# 1. Uvod
-
-## 1.1 Motivacija
-
-Respiratorna rehabilitacija predstavlja važan dio oporavka pacijenata nakon:
-
-- kirurških zahvata
-- respiratornih bolesti
-- dugotrajne hospitalizacije
-- smanjene plućne funkcije
-
-Jedan od najčešće korištenih uređaja za rehabilitaciju je Incentive Spirometer.
-
-Klasični spirometar koristi tri kuglice koje se podižu ovisno o protoku zraka koji korisnik ostvaruje tijekom udaha.
-
-Budući da laboratorijsko okruženje ne omogućava korištenje profesionalnih senzora protoka, u ovom projektu koristi se potenciometar kao emulator respiratornog protoka.
+Projekt obrađuje analogni signal potenciometra, filtrira ga eksponencijalnim
+kliznim prosjekom, određuje smjer disanja, računa volumen numeričkom
+integracijom, provjerava stabilnost udaha, vodi logiku vježbe u stvarnom vremenu
+i šalje sažetak rezultata u JSON formatu.
 
 ---
 
-## 1.2 Problem
+# 2. Uvod
 
-Tradicionalni spirometri koriste mehanički prikaz koji nije posebno zanimljiv korisniku.
+Poticajni spirometri koriste se u respiratornoj rehabilitaciji, posebno nakon
+kirurških zahvata, dugotrajnog ležanja ili stanja koja smanjuju plućnu funkciju.
+Njihova je svrha potaknuti pacijenta na kontroliran i dovoljno dubok udah, uz
+izbjegavanje prenaglog ili nestabilnog disanja.
 
-Zbog toga je odlučeno razviti alternativno korisničko sučelje koje:
+Zbog ograničenja laboratorijske opreme u ovom projektu ne koristi se stvarni
+senzor tlaka ili protoka zraka. Umjesto toga, potenciometar služi kao emulator
+protoka daha. Takav pristup omogućuje razvoj i testiranje ugradbenog programa
+bez pneumatske instalacije, a zadržava glavne zahtjeve zadatka: obradu signala,
+prikaz protoka, procjenu stabilnosti i provjeru uspješnosti vježbe.
 
-- zadržava medicinsku logiku
-- zadržava identične pragove protoka
-- pruža intuitivniji vizualni prikaz
-- povećava motivaciju korisnika
-
----
-
-## 1.3 Rješenje
-
-Razvijena je igra BalloonBreath.
-
-U igri:
-
-- balon predstavlja respiratorni napor
-- visina balona predstavlja protok zraka
-- Coach Indicator predstavlja stabilnost disanja
-- sigurna zona predstavlja optimalan terapijski raspon
+Posebna pažnja posvećena je komentaru profesora da je ciljana publika pacijent,
+a ne stručna osoba. Zato OLED prikaz nije opterećen svim tehničkim podacima.
+Pacijentu se prikazuje samo ono što mu je potrebno tijekom izvođenja vježbe:
+balon, sigurna zona, indikator stabilnosti i kratka jasna poruka. Detaljniji
+podaci i dalje se prikupljaju u pozadini te se mogu koristiti za kasniju analizu.
 
 ---
 
-# 2. Analiza zahtjeva
+# 3. Cilj projekta
 
-## 2.1 Obvezni zahtjevi
+Cilj projekta bio je izraditi ugrađeni sustav koji simulira rad poticajnog
+spirometra i provjerava kvalitetu vježbe disanja prema zadanim medicinskim
+uvjetima.
 
-Prema projektnom zadatku sustav mora omogućiti:
+Sustav mora razlikovati mirovanje, udah i izdah, prikazati tri razine protoka od
+600, 900 i 1200 ml/s, voditi vježbu bez blokirajućih kašnjenja i prepoznati
+uspješnu vježbu samo ako pacijent stabilno održava protok u sigurnoj zoni od
+900 do 1200 ml/s tijekom pet sekundi.
 
-| Zahtjev | Implementacija |
-|----------|----------|
-| Periodičko očitavanje potenciometra | ADC ESP32 |
-| Neblokirajući rad | millis() |
-| Filtriranje signala | EMA |
-| OLED prikaz | SSD1306 |
-| Logika vježbe | State Machine |
-| Uspjeh/neuspjeh | SUCCESS/PENALTY |
-| Vizualni prikaz | Balon |
-| Coach Indicator | Implementiran |
-| Dokumentacija | GitHub Wiki |
+Ako protok dosegne ili prijeđe 1200 ml/s, pokušaj se poništava jer to predstavlja
+prenagli udah. Time se simulira medicinski nepoželjan način izvođenja vježbe,
+kod kojeg previsok protok može značiti lošiju kontrolu disanja.
 
 ---
 
-## 2.2 Napredne funkcije
+# 4. Hardverska konfiguracija
 
-Projekt implementira dvije napredne funkcije:
+Projekt je razvijen za ESP32 DevKit V4 u Wokwi simulacijskom okruženju. Sustav se
+sastoji od tri glavne komponente:
 
-### Numerička integracija volumena
+| Komponenta | Uloga u sustavu |
+| ---------- | --------------- |
+| ESP32 DevKit V4 | Glavni mikrokontroler, obrada signala, logika vježbe i Wi-Fi komunikacija |
+| Potenciometar | Emulator protoka daha |
+| OLED SSD1306 | Prikaz stanja vježbe i povratna informacija pacijentu |
 
-Računanje ukupnog volumena udaha.
+Spajanje je izvedeno na sljedeći način:
 
-### NVS memorija
+| Signal | ESP32 pin |
+| ------ | --------- |
+| Potenciometar SIG | GPIO34 |
+| Potenciometar VCC | 3V3 |
+| Potenciometar GND | GND |
+| OLED SDA | GPIO21 |
+| OLED SCL | GPIO22 |
+| OLED VCC | 3V3 |
+| OLED GND | GND |
 
-Pohrana najboljeg rezultata između resetiranja uređaja.
-
----
-
-# 3. Hardverska arhitektura
-
-## 3.1 Komponente
-
-| Komponenta | Opis |
-|------------|------------|
-| ESP32 DevKit V4 | Glavni mikrokontroler |
-| OLED SSD1306 | Grafički prikaz |
-| Potenciometar | Emulator protoka |
-
----
-
-## 3.2 ESP32
-
-ESP32 je odabran zbog:
-
-- 12-bitnog ADC-a
-- velikog broja GPIO pinova
-- ugrađene WiFi podrške
-- NVS memorije
-- dovoljne procesorske snage
+Potenciometar je spojen na analogni ulaz GPIO34 jer ESP32 na tom pinu može
+očitavati 12-bitnu ADC vrijednost u rasponu od 0 do 4095.
 
 ---
 
-## 3.3 OLED zaslon
+# 5. Obrada ulaznog signala
 
-Karakteristike:
+Srednji položaj potenciometra predstavlja mirovanje. Budući da je ADC 12-bitni,
+sredina raspona nalazi se oko vrijednosti 2048. Oko te vrijednosti definirana je
+mrtva zona kako male oscilacije potenciometra ne bi pokretale vježbu.
 
-| Parametar | Vrijednost |
-|------------|------------|
-| Rezolucija | 128 × 64 px |
-| Sučelje | I2C |
-| Adresa | 0x3C |
-| SDA | GPIO21 |
-| SCL | GPIO22 |
-
----
-
-## 3.4 Potenciometar
-
-Potenciometar simulira:
-
-Q(t)
-
-odnosno trenutni protok zraka.
-
-ADC raspon:
-
-0 – 4095
-
-Mapiranje:
-
-0 – 1400 ml/s
-
----
-
-# 4. Arhitektura sustava
-
-## 4.1 Blok dijagram
-
-```mermaid
-flowchart LR
-    P[Potenciometar] --> A[ADC ESP32]
-    A --> F[EMA Filter]
-    F --> S[Stability Analysis]
-    S --> L[Game Logic]
-    L --> O[OLED Display]
-    L --> N[NVS Memory]
-```
-
-
-# 6. Upravljanje stanjima sustava
-
-Za implementaciju logike vježbe korišten je model konačnog automata (Finite State Machine).
-
-Takav pristup omogućava:
-
-- jednostavnije održavanje programa
-- pregledniju implementaciju
-- lakše testiranje
-- jasnu podjelu funkcionalnosti
-
----
-
-## 6.1 Stanja sustava
-
-| Stanje | Opis |
-|----------|----------|
-| IDLE | Sustav čeka početak vježbe |
-| RUNNING | Aktivna respiratorna vježba |
-| SUCCESS | Uspješno završena vježba |
-| PENALTY | Vježba poništena zbog prevelikog protoka |
-
----
-
-## 6.2 Dijagram stanja
-
-```mermaid
-stateDiagram-v2
-    [*] --> IDLE
-
-    IDLE --> RUNNING : Flow > 600
-    RUNNING --> SUCCESS : 900 <= Flow < 1200 and Stability > 80 and 5 sekundi
-    RUNNING --> PENALTY : Flow >= 1200
-    SUCCESS --> IDLE : istek prikaza
-    PENALTY --> IDLE : istek kazne
-```
-
----
-
-## 6.3 Stanje IDLE
-
-Početno stanje sustava.
-
-U ovom stanju:
-
-- sustav očitava potenciometar
-- prikazuje početni ekran
-- čeka da protok prijeđe 600 ml/s
-
-Prijelaz u RUNNING stanje:
+U programu su definirane konstante:
 
 ```cpp
-if(currentFlow > THRESHOLD_1)
+#define ADC_CENTER 2048
+#define DEADZONE 80
+```
+
+Ako je očitana vrijednost unutar mrtve zone, sustav je u stanju mirovanja. Ako je
+vrijednost veća od sredine, smjer se tumači kao udah. Ako je vrijednost manja od
+sredine, smjer se tumači kao izdah.
+
+Smjer disanja u programu je zapisan pomoću enumeracije:
+
+```cpp
+enum BreathDirection {
+  REST,
+  INHALE,
+  EXHALE
+};
+```
+
+Takvo mapiranje omogućuje da se volumen i uspješnost vježbe računaju samo tijekom
+udaha. Izdah se prikazuje kao zasebno stanje, ali ne pridonosi volumenu niti
+pokreće mjerenje uspjeha.
+
+---
+
+# 6. Filtriranje i izračun volumena
+
+Analogni signal potenciometra može biti nestabilan, posebno pri naglim pomacima.
+Zbog toga se koristi eksponencijalni klizni prosjek, odnosno EMA filtar:
+
+```cpp
+filteredFlow = EMA_ALPHA * rawFlow + (1.0 - EMA_ALPHA) * filteredFlow;
+```
+
+Odabrana vrijednost `EMA_ALPHA = 0.35` predstavlja kompromis između brzog odziva
+i smirenog prikaza. Manja vrijednost dala bi stabilniji, ali sporiji prikaz, dok
+bi veća vrijednost bila osjetljivija na trzaje.
+
+Ukupni volumen računa se numeričkom integracijom protoka kroz vrijeme:
+
+```cpp
+volume += currentFlow * dt;
+```
+
+Budući da je protok izražen u ml/s, a `dt` u sekundama, rezultat integracije je
+volumen u mililitrima. Volumen se povećava samo kada je vježba aktivna i kada je
+smjer disanja udah.
+
+---
+
+# 7. Logika vježbe
+
+Program je organiziran kao konačni automat stanja. Takav pristup omogućuje jasnu
+podjelu ponašanja sustava i neblokirajući rad bez korištenja `delay()` funkcije.
+
+Glavna stanja su:
+
+| Stanje | Opis |
+| ------ | ---- |
+| IDLE | Sustav čeka početak udaha |
+| RUNNING | Vježba je aktivna |
+| SUCCESS | Vježba je uspješno završena |
+| PENALTY | Pokušaj je poništen zbog prejakog udaha |
+| ABORTED | Pokušaj je prekinut jer uvjeti nisu održani |
+
+Vježba započinje kada korisnik napravi udah i protok prijeđe 600 ml/s. Tijekom
+aktivne vježbe sustav stalno provjerava protok, stabilnost i trajanje uvjeta.
+
+Uspjeh se priznaje samo ako su istovremeno zadovoljeni sljedeći uvjeti:
+
+- smjer je udah
+- protok je najmanje 900 ml/s
+- protok je manji od 1200 ml/s
+- stabilnost je najmanje 80 od 100
+- nije detektiran nagli trzaj potenciometra
+- uvjeti traju neprekidno pet sekundi
+
+Ako protok dosegne 1200 ml/s, aktivira se stanje `PENALTY`. Tada se pokušaj
+poništava i korisnik mora započeti novu vježbu.
+
+---
+
+# 8. Stabilnost i zaštita od pogrešaka
+
+Stabilnost udaha računa se iz promjene filtriranog protoka između dva uzorka.
+Ako se protok mijenja polako, stabilnost ostaje visoka. Ako se protok naglo
+mijenja, stabilnost pada.
+
+Pojednostavljeni izračun stabilnosti je:
+
+```cpp
+diff = fabs(currentFlow - prevFlow);
+stability = constrain(100 - diff / 4, 0, 100);
+```
+
+Osim toga, uvedena je posebna zaštita od naglog trzanja potenciometra. Ako je
+promjena sirovog protoka između dva uzorka veća od dopuštene granice, sustav to
+tretira kao nestabilan pokušaj:
+
+```cpp
+jerkDetected = rawFlowStep > MAX_FLOW_STEP;
+```
+
+Na taj način se sprječava da korisnik naglim pomicanjem potenciometra umjetno
+ostvari uvjete vježbe.
+
+---
+
+# 9. OLED sučelje za pacijenta
+
+Prva verzija prikaza sadržavala je više tehničkih podataka, što je korisno za
+razvoj, ali nije idealno za pacijenta. Konačno sučelje zato je pojednostavljeno.
+Na zaslonu se prikazuje jedan balon, tri praga protoka, sigurna zona, Coach
+Indicator i kratka poruka.
+
+Balon zamjenjuje mehaničke kuglice, ali zadržava istu medicinsku logiku:
+
+| Protok | Značenje u prikazu |
+| ------ | ------------------ |
+| 600 ml/s | početak korisnog udaha |
+| 900 ml/s | donja granica sigurne zone |
+| 1200 ml/s | gornja granica, nakon koje slijedi kazna |
+
+Sigurna zona nalazi se između 900 i 1200 ml/s. Korisnik treba održavati balon u
+toj zoni, dok Coach Indicator pokazuje koliko je protok stabilan.
+
+Poruke na zaslonu namjerno su kratke i napisane na engleskom jeziku zbog
+ograničene rezolucije OLED zaslona:
+
+| Poruka | Značenje |
+| ------ | -------- |
+| READY | Sustav čeka početak |
+| STRONGER | Udah je preslab |
+| ALMOST | Korisnik je blizu sigurne zone |
+| HOLD | Korisnik treba zadržati stabilan udah |
+| GREAT | Vježba je uspješno završena |
+| TOO FAST | Udah je presnažan |
+| STEADY | Protok je nestabilan |
+| TRY AGAIN | Pokušaj treba ponoviti |
+| TIME | Vrijeme je za novu vježbu |
+
+Tehnički podaci poput volumena, vršnog protoka i prosječne stabilnosti ne
+zagušuju glavni prikaz, nego se šalju poslužitelju i spremaju u memoriju.
+
+---
+
+# 10. Inercija balona
+
+Kako bi prikaz bio ugodniji i realističniji, balon se ne pomiče trenutno na novu
+poziciju. Umjesto toga, koristi se jednostavan model inercije. Balon ima trenutnu
+poziciju i brzinu, a prema ciljnoj poziciji pomiče se postupno.
+
+Osnovna ideja modela je:
+
+```cpp
+force = (targetY - balloonY) * 34.0;
+balloonVelocity += force * dt;
+balloonVelocity *= 0.70;
+balloonY += balloonVelocity * dt;
+```
+
+Time se simuliraju masa i prigušenje. Prikaz zato ne trza pri svakoj manjoj
+promjeni signala, nego se ponaša prirodnije i pacijentu daje čitljiviju povratnu
+informaciju.
+
+---
+
+# 11. IoT povezivost
+
+ESP32 se spaja na Wi-Fi mrežu i nakon svakog završenog ciklusa šalje rezultat
+vježbe poslužitelju. U Wokwi simulaciji koristi se mreža:
+
+```cpp
+#define WIFI_SSID "Wokwi-GUEST"
+#define WIFI_PASSWORD ""
+```
+
+Za demonstraciju slanja koristi se HTTP testni servis:
+
+```cpp
+#define SERVER_URL "https://httpbin.org/post"
+```
+
+Ako URL počinje s `https://`, program koristi `WiFiClientSecure`. U simulaciji se
+koristi `setInsecure()` kako bi HTTPS komunikacija radila bez lokalno učitanog
+certifikata. To je prihvatljivo za demonstraciju u Wokwiju, ali u stvarnoj
+primjeni trebalo bi koristiti vlastiti poslužitelj i ispravan root CA certifikat.
+
+Rezultat se šalje kao JSON poruka. Primjer sadržaja:
+
+```json
 {
-    currentState = RUNNING;
+  "device_id": "BalloonBreath-ESP32",
+  "result": "SUCCESS",
+  "volume_ml": 5388.0,
+  "peak_flow_ml_s": 1066.0,
+  "avg_stability": 94.2,
+  "best_volume_ml": 10981.0,
+  "best_peak_flow_ml_s": 1180.0,
+  "duration_ms": 7200,
+  "penalty": false
 }
 ```
 
----
-
-## 6.4 Stanje RUNNING
-
-Aktivna respiratorna vježba.
-
-Sustav:
-
-- prati protok
-- računa volumen
-- prati stabilnost
-- mjeri trajanje vježbe
-
-Ako su zadovoljeni svi uvjeti:
-
-- protok ≥ 900 ml/s
-- protok < 1200 ml/s
-- stabilnost > 80
-
-pokreće se mjerenje vremena.
+Slanje se može dokazati kroz Serial Monitor, gdje se ispisuje HTTP kod, poslani
+JSON i dio odgovora poslužitelja. `httpbin.org` vraća poslani sadržaj u odgovoru,
+ali ne čuva javnu povijest zahtjeva. Ako je potreban vizualan dokaz za
+prezentaciju, umjesto `httpbin.org` može se privremeno koristiti Webhook.site jer
+on prikazuje svaki zaprimljeni POST zahtjev u web sučelju.
 
 ---
 
-## 6.5 Stanje SUCCESS
+# 12. Trajna memorija i podsjetnik
 
-Aktivira se nakon uspješno održane vježbe.
-
-Uvjeti:
-
-- protok između 900 i 1200 ml/s
-- stabilnost > 80
-- trajanje ≥ 5 sekundi
-
-Sustav:
-
-- prikazuje SUCCESS poruku
-- sprema rekord ako je ostvaren novi najbolji rezultat
-- nakon nekoliko sekundi vraća se u IDLE stanje
-
----
-
-## 6.6 Stanje PENALTY
-
-Aktivira se kada:
-
-Flow ≥ 1200 ml/s
-
-što simulira:
-
-- prenagli udah
-- turbulenciju zraka
-- medicinski neispravno izvođenje vježbe
-
-Sustav:
-
-- poništava pokušaj
-- resetira mjerenje
-- prikazuje poruku upozorenja
-
----
-
-# 7. Coach Indicator
-
-## 7.1 Medicinska pozadina
-
-Klasični Incentive Spirometer sadrži indikator koji korisniku pokazuje kvalitetu udaha.
-
-Njegova funkcija je:
-
-- održavanje laminarnog toka zraka
-- sprječavanje naglih oscilacija
-- poboljšanje kvalitete respiratorne terapije
-
----
-
-## 7.2 Implementacija u projektu
-
-Coach Indicator prikazan je kao vertikalna traka na OLED zaslonu.
-
-Sastoji se od:
-
-- vanjskog okvira
-- ciljne zone
-- pomičnog indikatora
-
----
-
-## 7.3 Izračun
-
-Prvo se računa promjena protoka:
+Za spremanje najboljeg rezultata koristi se ESP32 NVS memorija preko biblioteke
+`Preferences`. Spremaju se najbolji volumen i najbolji vršni protok:
 
 ```cpp
-diff = abs(currentFlow - prevFlow);
+bestVol
+bestPeak
 ```
 
-zatim:
+Vrijednosti se učitavaju pri pokretanju sustava i šalju u JSON izvještaju nakon
+vježbe. Na taj način se rezultat ne gubi resetiranjem ESP32 mikrokontrolera.
 
-```cpp
-stability = 100 - diff / 4;
-```
-
-Vrijednost se ograničava:
-
-```cpp
-0 <= stability <= 100
-```
+Sustav također ima podsjetnik. Ako uspješna vježba nije obavljena unutar
+predviđenog vremena, OLED u stanju mirovanja prikazuje poruku `TIME`. U
+simulaciji je interval postavljen na 60 sekundi kako bi se funkcija mogla brzo
+testirati.
 
 ---
 
-## 7.4 Interpretacija
+# 13. Testiranje
 
-| Stability | Značenje |
-|------------|------------|
-| 90 – 100 | Vrlo stabilan udah |
-| 80 – 90 | Dobar udah |
-| 60 – 80 | Umjerena nestabilnost |
-| < 60 | Loša kontrola protoka |
+Testiranje je provedeno u Wokwi simulaciji promjenom položaja potenciometra i
+praćenjem OLED prikaza te Serial Monitora.
 
----
+| Testni slučaj | Očekivano ponašanje |
+| ------------- | ------------------- |
+| Potenciometar u sredini | Sustav prikazuje READY, protok je 0, volumen ne raste |
+| Lagani pomak udesno ispod 600 ml/s | Vježba se ne priznaje kao uspješna |
+| Stabilan udah između 900 i 1200 ml/s kroz 5 s | Prikazuje se GREAT i šalje se izvještaj |
+| Protok preko 1200 ml/s | Prikazuje se TOO FAST i pokušaj se poništava |
+| Pomak lijevo od sredine | Sustav prepoznaje izdah, volumen se ne povećava |
+| Nagli trzaj potenciometra | Prikazuje se STEADY i timer uspjeha se resetira |
+| Reset ESP32 nakon uspjeha | Najbolji rezultat ostaje spremljen u NVS memoriji |
+| Neaktivnost dulja od intervala podsjetnika | Prikazuje se TIME |
 
-# 8. OLED korisničko sučelje
-
-## 8.1 Prikaz podataka
-
-OLED zaslon prikazuje:
-
-| Element | Opis |
-|----------|----------|
-| BalloonBreath | Naziv projekta |
-| Record | Najbolji volumen |
-| Flow | Trenutni protok |
-| Coach Indicator | Stabilnost |
-| Balloon | Vizualizacija disanja |
-| Volume | Ukupni volumen |
-| Status | Trenutno stanje |
+Testiranjem je potvrđeno da sustav razlikuje udah, izdah i mirovanje, da
+primjenjuje medicinske pragove 600, 900 i 1200 ml/s te da uspjeh priznaje samo
+ako su uvjeti održani neprekidno pet sekundi.
 
 ---
 
-## 8.2 Prikaz balona
+# 14. Ograničenja i moguća poboljšanja
 
-Balon predstavlja protok zraka.
+Projekt je simulacijski, pa potenciometar ne može u potpunosti zamijeniti stvarni
+senzor protoka ili diferencijalnog tlaka. U stvarnoj primjeni bilo bi potrebno
+kalibrirati uređaj sa stvarnim senzorom i provjeriti točnost mjerenja na
+medicinski prihvatljiv način.
 
-Mapiranje:
+OLED zaslon rezolucije 128 x 64 px ograničava količinu informacija koja se može
+čitko prikazati. Zato je korisničko sučelje namjerno pojednostavljeno, a detaljni
+podaci se šalju poslužitelju.
 
-| Protok | Visina |
-|----------|----------|
-| 0 ml/s | Najniža pozicija |
-| 1400 ml/s | Najviša pozicija |
+Moguća buduća poboljšanja su:
 
----
-
-## 8.3 Sigurna zona
-
-Medicinska zona prikazana je unutar okvira.
-
-Predstavlja raspon:
-
-900 ml/s – 1200 ml/s
-
-Korisnik mora održavati balon unutar tog područja.
+- korištenje stvarnog senzora protoka ili tlaka
+- razvoj web aplikacije za liječnika
+- prikaz povijesti vježbi kroz grafove
+- korištenje vlastitog HTTPS poslužitelja s certifikatom
+- dodavanje korisničkih profila za više pacijenata
+- dulje testiranje s različitim parametrima filtriranja
 
 ---
 
-## 8.4 Statusne poruke
-
-| Poruka | Značenje |
-|----------|----------|
-| READY | Sustav čeka početak |
-| H:x.x | Odbrojavanje vremena |
-| SUCCESS | Uspješna vježba |
-| FAST! | Prevelik protok |
-
----
-
-# 9. Testiranje sustava
-
-## 9.1 Ciljevi testiranja
-
-Provjeriti:
-
-- ispravnost ADC očitanja
-- EMA filtriranje
-- izračun volumena
-- logiku vježbe
-- spremanje rekorda
-- prikaz na OLED zaslonu
-
----
-
-## 9.2 Test 1 – ADC
-
-### Postupak
-
-Rotiranje potenciometra od minimuma do maksimuma.
-
-### Očekivani rezultat
-
-ADC:
-
-0 – 4095
-
-### Rezultat
-
-✓ Uspješno
-
----
-
-## 9.3 Test 2 – Filtriranje
-
-### Postupak
-
-Nagla promjena potenciometra.
-
-### Očekivani rezultat
-
-Postupna promjena prikaza.
-
-### Rezultat
-
-✓ Uspješno
-
----
-
-## 9.4 Test 3 – SUCCESS stanje
-
-### Postupak
-
-Održavanje protoka:
-
-900 – 1200 ml/s
-
-dulje od 5 sekundi.
-
-### Rezultat
-
-✓ SUCCESS prikazan
-
----
-
-## 9.5 Test 4 – PENALTY stanje
-
-### Postupak
-
-Protok > 1200 ml/s
-
-### Rezultat
-
-✓ PENALTY aktiviran
-
----
-
-## 9.6 Test 5 – NVS memorija
-
-### Postupak
-
-Ostvariti rekord.
-
-Resetirati ESP32.
-
-### Rezultat
-
-✓ Rekord ostaje spremljen
-
----
-
-# 10. Rezultati
-
-Projekt uspješno ostvaruje sve zahtjeve projektnog zadatka.
-
-Implementirane funkcionalnosti:
-
-✓ očitavanje potenciometra
-
-✓ filtriranje signala
-
-✓ Coach Indicator
-
-✓ numerička integracija volumena
-
-✓ OLED prikaz
-
-✓ logika uspjeha i neuspjeha
-
-✓ NVS pohrana
-
-✓ neblokirajući rad
-
-✓ alternativni scenarij BalloonBreath
-
----
-
-# 11. Rasprava
-
-Najveći izazovi tijekom razvoja bili su:
-
-- odabir EMA koeficijenta
-- definiranje stabilnosti
-- dizajn korisničkog sučelja
-- usklađivanje medicinskih zahtjeva s igrifikacijom
-
-EMA koeficijent od 0.20 pokazao se kao optimalan kompromis između:
-
-- brzine odziva
-- stabilnosti prikaza
-
-Coach Indicator omogućio je dodatnu procjenu kvalitete udaha koja nije vezana samo uz jačinu protoka.
-
----
-
-# 12. Moguća proširenja
-
-Projekt se može dodatno unaprijediti:
-
-- WiFi povezivanjem
-- MQTT komunikacijom
-- slanjem podataka liječniku
-- web aplikacijom
-- mobilnom aplikacijom
-- grafovima napretka pacijenta
-- pravim senzorom diferencijalnog tlaka
-
----
-
-# 13. Zaključak
-
-BalloonBreath predstavlja uspješnu implementaciju digitalnog spirometra na ESP32 platformi.
-
-Projekt demonstrira:
-
-- obradu analognih signala
-- digitalno filtriranje
-- upravljanje stanjima
-- numeričku integraciju
-- rad s OLED zaslonom
-- trajnu pohranu podataka
-
-Korištenjem scenarija balona na vrući zrak ostvarena je zanimljiva i intuitivna vizualizacija respiratorne terapije, pri čemu su svi medicinski pragovi i uvjeti iz izvornog spirometra ostali očuvani.
-
-Projekt zadovoljava sve obvezne i dio naprednih zahtjeva projektnog zadatka te predstavlja uspješnu demonstraciju primjene ugrađenih sustava u području digitalne zdravstvene tehnologije.
+# 15. Zaključak
+
+BalloonBreath uspješno demonstrira kako se zahtjevi poticajnog spirometra mogu
+prenijeti u ugrađeni sustav s ESP32 mikrokontrolerom. Sustav zadržava bitne
+medicinske pragove od 600, 900 i 1200 ml/s, provjerava stabilnost udaha, računa
+volumen, sprema najbolji rezultat i šalje podatke poslužitelju.
+
+Kroz ovaj projekt naučili smo kako se jednostavan analogni ulaz može pretvoriti
+u smislen pokazatelj ako se pravilno definiraju nulta točka, smjer signala,
+filtriranje i vremenska logika. Također smo naučili da korisničko sučelje nije
+samo estetski dodatak, nego važan dio funkcionalnosti, posebno kada je sustav
+namijenjen pacijentima.
+
+Najvažnije iskustvo bilo je povezivanje više područja u jednu cjelinu: obrada
+analognih signala, neblokirajuće programiranje, modeliranje inercije, OLED
+grafika, trajna memorija i Wi-Fi/HTTPS komunikacija. Projekt nam je pokazao da
+ugradbeni sustav mora biti tehnički ispravan, ali i razumljiv korisniku koji ga
+treba koristiti u stvarnoj vježbi.

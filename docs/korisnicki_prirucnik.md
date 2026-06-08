@@ -2,385 +2,195 @@
 
 ## BalloonBreath
 
-### IoT digitalni spirometar na ESP32 platformi
+BalloonBreath je simulacija poticajnog spirometra na ESP32 platformi. OLED prikaz
+prilagođen je pacijentima: prikazuje jedan balon, sigurnu zonu i kratke poruke.
 
 ---
 
-# 1. Uvod
+# 1. Pokretanje u Wokwiju
 
-BalloonBreath je edukacijski sustav koji simulira rad medicinskog poticajnog spirometra (Incentive Spirometer).
+Wokwi projekt dostupan je na poveznici:
 
-Sustav koristi:
+https://wokwi.com/projects/466203868077330433
 
-- ESP32 mikrokontroler
-- OLED SSD1306 zaslon
-- potenciometar kao simulator protoka zraka
+1. Otvoriti Wokwi projekt.
+2. U `sketch.ino` zalijepiti sadržaj iz `wokwi/sketch.ino`.
+3. Provjeriti jesu li OLED i potenciometar spojeni kao u `diagram.json`.
+4. Kliknuti Run.
+5. Otvoriti Serial Monitor za Wi-Fi, HTTPS i JSON poruke.
 
-Cilj korisnika je održavati simulirani protok zraka unutar zadanog medicinskog raspona tijekom pet sekundi.
+Za Wokwi Wi-Fi koristi:
 
----
-
-# 2. Potrebna oprema
-
-Za korištenje sustava potrebno je:
-
-| Komponenta | Količina |
-|------------|------------|
-| ESP32 DevKit V4 | 1 |
-| OLED SSD1306 128x64 | 1 |
-| Potenciometar | 1 |
-| USB kabel | 1 |
-
----
-
-# 3. Pokretanje sustava
-
-## Korak 1
-
-Spojiti ESP32 s računalom.
-
----
-
-## Korak 2
-
-Pokrenuti projekt u [Wokwi simulatoru](https://wokwi.com/projects/465562606015886337) ili prenijeti program na fizički ESP32 uređaj.
-
----
-
-## Korak 3
-
-Nakon pokretanja na OLED zaslonu prikazuje se početni ekran.
-
-Prikaz:
-
-```text
-BalloonBreath
-R: 0
-F: 0
-READY
+```cpp
+WIFI_SSID = "Wokwi-GUEST"
+WIFI_PASSWORD = ""
 ```
 
 ---
 
-# 4. Korisničko sučelje
+# 2. Spajanje
 
-OLED zaslon prikazuje nekoliko informacija.
-
----
-
-## 4.1 Naziv projekta
-
-```text
-BalloonBreath
-```
-
-Prikazuje naziv sustava.
+| Komponenta | ESP32 |
+| ---------- | ----- |
+| Potenciometar SIG | GPIO34 |
+| Potenciometar VCC | 3V3 |
+| Potenciometar GND | GND |
+| OLED SDA | GPIO21 |
+| OLED SCL | GPIO22 |
+| OLED VCC | 3V3 |
+| OLED GND | GND |
 
 ---
 
-## 4.2 Record
+# 3. Korištenje potenciometra
 
-```text
-R: 12345
-```
+Potenciometar se koristi kao emulator daha:
 
-Prikazuje najveći ostvareni volumen spremljen u NVS memoriji.
+- sredina: mirovanje
+- desno od sredine: udah
+- lijevo od sredine: izdah
 
----
-
-## 4.3 Flow
-
-```text
-F: 980
-```
-
-Prikazuje trenutni protok zraka izražen u ml/s.
+Mala mrtva zona oko sredine sprječava lažne male protoke.
 
 ---
 
-## 4.4 Balloon
+# 4. OLED prikaz
 
-Balon predstavlja trenutnu jačinu udaha.
+OLED prikazuje:
 
-Pravila:
+- naziv BalloonBreath
+- Wi-Fi indikator u gornjem desnom kutu
+- jedan veliki balon
+- oznake 600, 900 i 1200 ml/s
+- sigurnu zonu 900-1200 ml/s
+- Coach Indicator desno
+- kratku poruku pacijentu
+- rezultat volumena nakon uspjeha
 
-- slab protok → balon se nalazi nisko
-- optimalan protok → balon se nalazi u sredini
-- prejak protok → balon odlazi previsoko
-
----
-
-## 4.5 Coach Indicator
-
-Coach Indicator nalazi se na desnoj strani OLED zaslona.
-
-Njegova svrha je:
-
-- prikaz stabilnosti disanja
-- simulacija medicinskog indikatora
-- pružanje biofeedback informacije
-
-Ako se pokazivač nalazi unutar ciljne zone:
-
-disanje je dovoljno stabilno.
-
----
-
-## 4.6 Volume
-
-```text
-V: 8450
-```
-
-Prikazuje ukupni volumen udaha.
-
----
-
-## 4.7 Status
-
-Moguće poruke:
+Poruke:
 
 | Poruka | Značenje |
-|----------|----------|
-| READY | Sustav čeka početak |
-| H:2.4 | Odbrojavanje |
-| SUCCESS | Uspješna vježba |
-| FAST! | Prevelik protok |
+| ------ | -------- |
+| READY | Sustav čeka udah |
+| STRONGER | Udah je preslab |
+| ALMOST | Korisnik je blizu sigurne zone |
+| HOLD | Korisnik je u sigurnoj zoni |
+| GREAT | Vježba je uspješna |
+| TOO FAST | Protok je dosegao 1200 ml/s |
+| STEADY | Nagli trzaj ili nestabilan protok |
+| TRY AGAIN | Pokušaj je prekinut |
+| TIME | Podsjetnik za vježbu |
 
 ---
 
-# 5. Pravila igre
+# 5. Pravila vježbe
 
-BalloonBreath koristi medicinska pravila spirometra.
+Vježba počinje kada udah prijeđe 600 ml/s.
+
+Za uspjeh treba održati:
+
+- udah
+- protok od najmanje 900 ml/s
+- protok manji od 1200 ml/s
+- stabilnost najmanje 80
+- rad bez naglog trzaja
+- uvjete neprekidno 5 sekundi
+
+Ako protok dosegne 1200 ml/s, pokušaj se poništava i prikazuje se `TOO FAST`.
 
 ---
 
-## Uvjeti uspjeha
+# 6. Wi-Fi, HTTPS i slanje podataka
 
-Korisnik mora:
+Nakon završetka ciklusa ESP32 šalje JSON poruku serveru. Zadani testni server je:
 
-- ostvariti protok veći od 900 ml/s
-- ne prijeći 1200 ml/s
-- održavati stabilnost veću od 80
-- održavati uvjete 5 sekundi
-
----
-
-## Uvjeti neuspjeha
-
-Ako protok prijeđe:
-
-```text
-1200 ml/s
+```cpp
+https://httpbin.org/post
 ```
 
-vježba se poništava.
+U kodu se to mijenja ovdje:
 
-Prikazuje se poruka:
-
-```text
-FAST!
+```cpp
+#define SERVER_URL "https://httpbin.org/post"
 ```
 
-Nakon kratkog vremena sustav se resetira.
+Ako URL počinje s `https://`, program koristi `WiFiClientSecure`. U demonstraciji
+se koristi `setInsecure()` kako bi Wokwi mogao slati HTTPS bez dodavanja certifikata.
+Za stvarnu medicinsku primjenu treba koristiti pravi server i root CA certifikat.
 
----
+Primjer JSON poruke:
 
-# 6. Tijek korištenja
-
-## Korak 1
-
-Okretati potenciometar.
-
----
-
-## Korak 2
-
-Balon se počinje podizati.
-
----
-
-## Korak 3
-
-Pokušati zadržati balon u sigurnoj zoni.
-
----
-
-## Korak 4
-
-Coach Indicator mora ostati u ciljnom području.
-
----
-
-## Korak 5
-
-Održavati stanje pet sekundi.
-
----
-
-## Korak 6
-
-Ako je vježba uspješna:
-
-prikazuje se poruka:
-
-```text
-SUCCESS
+```json
+{
+  "device_id": "BalloonBreath-ESP32",
+  "result": "SUCCESS",
+  "volume_ml": 5388.0,
+  "peak_flow_ml_s": 1066.0,
+  "avg_stability": 94.2,
+  "best_volume_ml": 10981.0,
+  "best_peak_flow_ml_s": 1180.0,
+  "duration_ms": 7200,
+  "penalty": false
+}
 ```
 
 ---
 
-# 7. Primjeri korištenja
+# 7. Kako dokazati da slanje radi
 
-## Primjer 1 – Uspješan pokušaj
+## Opcija 1: Serial Monitor
 
-Flow:
-
-```text
-1000 ml/s
-```
-
-Stability:
+Nakon uspjeha ili kazne u Serial Monitoru treba se vidjeti:
 
 ```text
-90
+[REPORT] Queued SUCCESS
+[HTTP] POST https://httpbin.org/post code=200
+{... JSON ...}
+[HTTP] Response preview: ...
 ```
 
-Vrijeme:
+`code=200` znači da je server primio zahtjev.
 
-```text
-5 s
-```
+## Opcija 2: Webhook.site
 
-Rezultat:
+Za vidljiv dokaz u pregledniku:
 
-```text
-SUCCESS
-```
+1. Otvoriti Webhook.site.
+2. Kopirati jedinstveni URL koji stranica generira.
+3. U kodu zamijeniti `SERVER_URL` tim URL-om.
+4. Pokrenuti vježbu u Wokwiju.
+5. Nakon slanja, POST zahtjev i JSON vide se na Webhook.site stranici.
+
+`httpbin.org` je dobar za test jer vraća odgovor u Serial Monitor, ali ne čuva
+javnu povijest zahtjeva. Webhook.site je bolji za demonstraciju profesorima.
 
 ---
 
-## Primjer 2 – Presnažan udah
+# 8. NVS povijest
 
-Flow:
+ESP32 pamti:
 
-```text
-1300 ml/s
-```
+- najbolji volumen
+- najbolji vršni protok
 
-Rezultat:
-
-```text
-FAST!
-```
+Podaci ostaju spremljeni nakon resetiranja jer se koristi NVS `Preferences`.
 
 ---
 
-## Primjer 3 – Nestabilno disanje
+# 9. Testovi
 
-Flow:
-
-```text
-950 ml/s
-```
-
-Stability:
-
-```text
-55
-```
-
-Rezultat:
-
-timer se resetira.
+1. Potenciometar u sredini: status READY, protok 0.
+2. Pomaknuti desno iznad 600: vježba počinje.
+3. Držati 900-1200 ml/s kroz 5 sekundi: GREAT.
+4. Otići preko 1200 ml/s: TOO FAST.
+5. Pomaknuti lijevo: sustav traži udah, volumen ne raste.
+6. Naglo trznuti: STEADY.
+7. Pričekati 60 sekundi bez uspjeha: TIME.
+8. Nakon SUCCESS provjeriti Serial Monitor ili Webhook.site za POST.
 
 ---
 
-# 8. Spremanje rezultata
+# 10. Napomena
 
-Projekt koristi NVS memoriju.
-
-Sprema se:
-
-- najveći volumen
-
-Prednost:
-
-podaci ostaju spremljeni i nakon gašenja uređaja.
-
----
-
-# 9. Serial Monitor
-
-Sustav ispisuje dijagnostičke informacije.
-
-Primjer:
-
-```text
-===== BALLOONBREATH =====
-
-FLOW = 934 ml/s
-FLOW = 945 ml/s
-FLOW = 960 ml/s
-
-[START]
-
-FLOW = 1002 ml/s
-
-[SUCCESS]
-
-[NVS] Novi rekord: 8423
-```
-
----
-
-# 10. Rješavanje problema
-
-## OLED je prazan
-
-Provjeriti:
-
-- SDA → GPIO21
-- SCL → GPIO22
-- I2C adresu 0x3C
-
----
-
-## Potenciometar ne reagira
-
-Provjeriti:
-
-- SIG → GPIO34
-- VCC → 3.3V
-- GND → GND
-
----
-
-## Rekord se ne sprema
-
-Provjeriti:
-
-- Preferences biblioteku
-- ESP32 platformu
-
----
-
-# 11. Sigurno korištenje
-
-Projekt je edukacijska simulacija.
-
-Nije namijenjen:
-
-- medicinskoj dijagnostici
-- kliničkoj uporabi
-- terapijskim odlukama
-
-Svi prikazani podaci služe isključivo za potrebe nastave i demonstracije rada ugrađenih sustava.
-
----
-
-# 12. Zaključak
-
-BalloonBreath omogućuje jednostavno i intuitivno izvođenje simulirane respiratorne vježbe korištenjem ESP32 platforme.
-
-Kombinacijom OLED grafike, Coach Indicatora i pohrane rezultata sustav uspješno demonstrira osnovne principe rada digitalnog spirometra.
+Projekt je edukacijska simulacija i nije namijenjen medicinskoj dijagnostici ili
+kliničkoj uporabi.
